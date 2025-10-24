@@ -1,23 +1,19 @@
 # syntax=docker/dockerfile:1.7-labs
 FROM python:3.12-slim AS base
 
-ENV POETRY_HOME=/opt/poetry \
-    POETRY_VERSION=1.8.3 \
-    POETRY_NO_INTERACTION=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_CACHE_DIR=/tmp/uv-cache
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_VERSION} \
-    && ln -s ${POETRY_HOME}/bin/poetry /usr/local/bin/poetry
+    && pip install --no-cache-dir uv
 
 WORKDIR /app
 
-COPY src/backend/pyproject.toml src/backend/poetry.lock* ./
-RUN poetry config virtualenvs.create false \
-    && poetry install --only main --no-ansi
+COPY src/backend/pyproject.toml src/backend/uv.lock ./
+RUN uv pip install --system --no-cache --locked -r uv.lock
 
 COPY src/backend/app ./app
 COPY src/backend/alembic ./alembic

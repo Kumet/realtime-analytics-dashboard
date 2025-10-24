@@ -4,6 +4,7 @@ __pycache__/
 *.so
 *.egg-info/
 .poetry/
+**/.pytest_cache/
 
 # FastAPI / local envs
 .env
