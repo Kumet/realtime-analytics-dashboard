@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api import api_router
 from app.core.config import settings
+from app.services.generator import start_generator
 from app.db.seed import seed_initial_data
 from app.db.session import SessionLocal, get_db
 
@@ -38,6 +40,7 @@ def startup() -> None:
             seed_initial_data(session)
     except Exception as exc:  # pragma: no cover - best effort seeding
         logger.warning("Skipping database seed during startup: %s", exc)
+    asyncio.create_task(start_generator())
 
 
 @app.get("/health")
