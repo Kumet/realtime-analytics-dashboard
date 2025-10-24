@@ -55,3 +55,17 @@ docker compose stop db
 ```
 
 `DATABASE_URL` を指定しない場合は `.env` に定義した接続情報（デフォルトで `postgresql+psycopg://radb:radb@db:5432/radb`）が利用されます。
+
+## pre-commit の導入
+コードスタイルと簡易チェックは [pre-commit](https://pre-commit.com/) で管理しています。
+
+```bash
+# ルートディレクトリでフックをインストール
+cd src/backend
+uv run pre-commit install --config ../../.pre-commit-config.yaml
+
+# すべてのファイルに対してチェックを実行
+uv run pre-commit run --all-files --config ../../.pre-commit-config.yaml
+```
+
+初回実行時は依存のダウンロードに時間がかかる場合があります。

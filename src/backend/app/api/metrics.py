@@ -3,14 +3,16 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
 from app.schemas.metrics import MetricSeriesResponse
 
 router = APIRouter()
 
 
-def _mock_metrics(metric_type: str, start_at: datetime, end_at: datetime) -> MetricSeriesResponse:
+def _mock_metrics(
+    metric_type: str, start_at: datetime, end_at: datetime
+) -> MetricSeriesResponse:
     duration = (end_at - start_at).total_seconds() or 1
     steps = max(int(duration), 1)
     interval = max(duration / steps, 1)

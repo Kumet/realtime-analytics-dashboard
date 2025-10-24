@@ -8,14 +8,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=True
+    )
 
     app_name: str = "Realtime Analytics Dashboard"
     app_env: str = Field(default="local", alias="APP_ENV")
     secret_key: str = Field(default="change-this", alias="SECRET_KEY")
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
-    cors_origins: List[str] | str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
+    access_token_expire_minutes: int = Field(
+        default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
+    )
+    cors_origins: List[str] | str = Field(
+        default="http://localhost:5173", alias="CORS_ORIGINS"
+    )
 
     database_url_override: str | None = Field(default=None, alias="DATABASE_URL")
     postgres_host: str = Field(default="db", alias="POSTGRES_HOST")
