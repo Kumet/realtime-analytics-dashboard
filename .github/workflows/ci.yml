@@ -11,9 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pipx install uv
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run pytest -q
+      - working-directory: src/backend
+        run: uv sync --frozen
+      - working-directory: src/backend
+        run: uvx ruff check .
+      - working-directory: src/backend
+        run: uv run pytest -q
 
   frontend:
     name: CI / frontend
@@ -23,6 +26,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - run: corepack enable
-      - run: pnpm install --frozen-lockfile || pnpm install
-      - run: pnpm run -s lint || echo "skip lint"
-      - run: pnpm run -s test -- --run || echo "skip test"
+      - working-directory: src/frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+      - working-directory: src/frontend
+        run: pnpm run -s lint || echo "skip lint"
+      - working-directory: src/frontend
+        run: pnpm run -s test -- --run || echo "skip test"
