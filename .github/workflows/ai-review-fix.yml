@@ -1,0 +1,144 @@
+name: AI Review & Fix
+on:
+  pull_request_target:
+    types: [opened, synchronize, labeled, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request_target' && contains(join(github.event.pull_request.labels.*.name, ','), 'ai-auto')) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/ai-fix'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.issue.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: corepack enable && pnpm -v || true
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pipx install uv
+
+      - name: Install deps (backend)
+        run: uv sync --frozen
+      - name: Install deps (frontend)
+        working-directory: src/frontend
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Run checks once to capture failures
+        id: checks
+        continue-on-error: true
+        run: |
+          set -e
+          echo "## Backend" > ci_failures.txt || true
+          (uv run ruff check . && uv run pytest -q) || echo "BACKEND_FAILED=1" >> $GITHUB_OUTPUT
+          echo "## Frontend" >> ci_failures.txt || true
+          (pnpm -C src/frontend run -s lint && pnpm -C src/frontend run -s test -- --run) || echo "FRONTEND_FAILED=1" >> $GITHUB_OUTPUT
+
+      - name: Decide need fix
+        id: need_fix
+        run: |
+          if [ "${{ steps.checks.outputs.BACKEND_FAILED }}${{ steps.checks.outputs.FRONTEND_FAILED }}" != "" ]; then
+            echo "NEED=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup AI fixer
+        if: steps.need_fix.outputs.NEED == '1'
+        run: |
+          mkdir -p tools
+          cat > tools/ai_review_fix.py <<'PY'
+import os, subprocess, re, tempfile, textwrap, sys
+
+def sh(cmd, capture=False):
+    res = subprocess.run(cmd, shell=True, check=False, text=True,
+                         stdout=subprocess.PIPE if capture else None,
+                         stderr=subprocess.STDOUT if capture else None)
+    return (res.returncode, res.stdout if capture else "")
+
+def get_diff():
+    code, out = sh('git diff --unified=0 origin/$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo main)...HEAD', capture=True)
+    return out
+
+def get_changed_files():
+    return sh('git diff --name-only origin/$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo main)...HEAD', capture=True)[1]
+
+def openai_call(prompt):
+    import requests
+    key = os.environ["OPENAI_API_KEY"]
+    model = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+    r = requests.post("https://api.openai.com/v1/responses",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json={"model": model, "input": prompt}, timeout=120)
+    r.raise_for_status()
+    data = r.json()
+    return data.get("output_text", "")
+
+def make_prompt(diff, files):
+    failures = open("ci_failures.txt","r",encoding="utf-8").read() if os.path.exists("ci_failures.txt") else "(no logs)"
+    return textwrap.dedent(f"""
+You are an expert software engineer. Fix the PR so that CI passes (ruff/pytest, eslint/vitest).
+
+Changed files:
+{files}
+
+CI failures (trimmed):
+{failures}
+
+Unified diff of current changes:
+<<DIFF
+{diff}
+DIFF
+
+Return ONLY a unified diff patch that can be applied by `git apply --whitespace=fix -p0`.
+Do small, incremental edits. Don't touch unrelated files.
+<<PATCH
+<patch here>
+PATCH
+""")
+
+def extract_patch(text: str) -> str:
+    m = re.search(r"<<PATCH\\n(.*)\\nPATCH", text, re.DOTALL)
+    return m.group(1).strip() if m else ""
+
+def main():
+    diff = get_diff()
+    files = get_changed_files()
+    if not diff.strip():
+        print("No diff; skip.")
+        return
+    prompt = make_prompt(diff, files)
+    # NOTE: OPENAI_API_KEY を GitHub Secrets に設定してから実行されます
+    txt = openai_call(prompt)
+    patch = extract_patch(txt)
+    if not patch:
+        print("No patch")
+        sys.exit(0)
+    tmp = tempfile.NamedTemporaryFile("w", delete=False)
+    tmp.write(patch); tmp.close()
+    code,_ = sh(f"git apply --whitespace=fix {tmp.name}")
+    if code != 0:
+        print("Patch apply failed")
+        sys.exit(0)
+    sh("git add -A")
+    sh('git commit -m "[ai-fix] apply patch"')
+    sh("git push")
+    print("Pushed AI fix")
+if __name__ == "__main__":
+    main()
+PY
+
+      - name: Run AI fixer
+        if: steps.need_fix.outputs.NEED == '1'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4.1-mini
+        run: python tools/ai_review_fix.py
