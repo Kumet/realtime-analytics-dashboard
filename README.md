@@ -31,3 +31,27 @@ docker-compose.yml # バックエンド・フロント・Postgres・Redis を一
 ```
 
 現状のバックエンドは `/health`、`/auth/login`、`/metrics` をモックデータ付きで公開しています。フロントエンドはログインフォームとダッシュボードのプレースホルダ画面を備えており、今後のステップで機能拡張していく想定です。
+
+## uv での依存管理とマイグレーション
+バックエンドは Python 3.12 + uv で依存管理を行います。
+
+### 依存の追加
+```bash
+cd src/backend
+uv add fastapi "uvicorn[standard]" sqlalchemy "psycopg[binary]" alembic \
+  pydantic-settings "passlib[bcrypt]" "python-jose[cryptography]"
+uv add --dev pytest httpx
+```
+
+### マイグレーションの作成と適用
+```bash
+cd src/backend
+uv run alembic revision -m "init users & metrics"
+# 開発環境の Postgres を起動
+docker compose up -d db
+# ホストから接続する場合は DATABASE_URL を指定
+DATABASE_URL=postgresql+psycopg://radb:radb@localhost:5432/radb uv run alembic upgrade head
+docker compose stop db
+```
+
+`DATABASE_URL` を指定しない場合は `.env` に定義した接続情報（デフォルトで `postgresql+psycopg://radb:radb@db:5432/radb`）が利用されます。

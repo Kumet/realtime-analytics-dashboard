@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     cors_origins: List[str] | str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 
+    database_url_override: str | None = Field(default=None, alias="DATABASE_URL")
     postgres_host: str = Field(default="db", alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
     postgres_db: str = Field(default="radb", alias="POSTGRES_DB")
@@ -35,6 +36,8 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         return (
             f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
