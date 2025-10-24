@@ -1,23 +1,23 @@
-import { useState } from 'react'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-import './App.css'
+import './index.css'
 import { DashboardPage } from './pages/Dashboard'
 import { LoginPage } from './pages/Login'
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    Boolean(localStorage.getItem('rad_token')),
-  )
+const router = createBrowserRouter([
+  { path: '/', element: <LoginPage /> },
+  { path: '/dashboard', element: <DashboardPage /> },
+])
 
-  return (
-    <div className="app-shell">
-      {isAuthenticated ? (
-        <DashboardPage />
-      ) : (
-        <LoginPage onSuccess={() => setIsAuthenticated(true)} />
-      )}
-    </div>
-  )
-}
+const queryClient = new QueryClient()
 
-export default App
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </StrictMode>,
+)

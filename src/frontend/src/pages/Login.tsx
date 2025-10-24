@@ -1,25 +1,35 @@
-import type { FormEvent } from 'react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-import { useAuth } from '../hooks/useAuth'
+import './Login.css'
+import { login } from '../lib/api'
 
-export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
+export function LoginPage() {
   const [email, setEmail] = useState('admin@example.com')
-  const [password, setPassword] = useState('password123')
-  const { auth, signIn } = useAuth()
+  const [password, setPassword] = useState('adminpass')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const success = await signIn({ email, password })
-    if (success) {
-      onSuccess()
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await login({ email, password })
+      localStorage.setItem('rad_token', result.access_token)
+      navigate('/dashboard')
+    } catch {
+      setError('認証に失敗しました')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="login-container">
-      <h1>Realtime Analytics Dashboard</h1>
-      <form className="login-form" onSubmit={handleSubmit}>
+    <div className="login-page">
+      <form className="login-form" onSubmit={handleLogin}>
+        <h1>Realtime Analytics Dashboard</h1>
         <label>
           Email
           <input
@@ -40,10 +50,10 @@ export function LoginPage({ onSuccess }: { onSuccess: () => void }) {
           />
         </label>
 
-        <button type="submit" disabled={auth.isLoading}>
-          {auth.isLoading ? 'Signing in...' : 'Sign in'}
+        <button type="submit" disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign in'}
         </button>
-        {auth.error ? <p className="error">{auth.error}</p> : null}
+        {error ? <p className="login-error">{error}</p> : null}
       </form>
     </div>
   )

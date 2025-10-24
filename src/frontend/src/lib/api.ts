@@ -1,4 +1,25 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+import axios from 'axios'
+
+type MethodsWithoutBody = 'get' | 'delete'
+type MethodsWithBody = 'post' | 'put' | 'patch'
+export type HttpMethod = MethodsWithoutBody | MethodsWithBody
+
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('rad_token')
+  if (token) {
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 export interface LoginPayload {
   email: string
@@ -10,16 +31,28 @@ export interface LoginResponse {
   token_type: string
 }
 
-export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+export const login = async (
+  payload: LoginPayload,
+): Promise<LoginResponse> => {
+  const { data } = await apiClient.post<LoginResponse>('/auth/login', payload)
+  return data
+}
+
+export interface MetricPoint {
+  timestamp: string
+  value: number
+  type: string
+}
+
+export interface MetricSeriesResponse {
+  series: MetricPoint[]
+}
+
+export const fetchMetrics = async (
+  params: { type: string; from?: string; to?: string } = { type: 'cpu' },
+): Promise<MetricSeriesResponse> => {
+  const { data } = await apiClient.get<MetricSeriesResponse>('/metrics', {
+    params,
   })
-
-  if (!response.ok) {
-    throw new Error('Failed to authenticate')
-  }
-
-  return response.json() as Promise<LoginResponse>
+  return data
 }
