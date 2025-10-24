@@ -14,7 +14,7 @@ jobs:
       - working-directory: src/backend
         run: uv sync --frozen
       - working-directory: src/backend
-        run: uv run ruff check .
+        run: uvx ruff check .
       - working-directory: src/backend
         run: uv run pytest -q
 

@@ -1,11 +1,13 @@
 backend:
   - changed-files:
-      - any-glob-to-any-file: ["src/backend/**"]
+      - any-glob-to-any-file:
+          - src/backend/**
 frontend:
   - changed-files:
-      - any-glob-to-any-file: ["src/frontend/**"]
+      - any-glob-to-any-file:
+          - src/frontend/**
 auto-merge:
   - changed-files:
       - any-glob-to-any-file:
-          - "src/backend/**"
-          - "src/frontend/**"
+          - src/backend/**
+          - src/frontend/**
