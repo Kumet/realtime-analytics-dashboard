@@ -1,0 +1,68 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      PYTHONPATH: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - '8000:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./src/backend/app:/app/app:ro
+      - ./src/backend/alembic:/app/alembic:ro
+      - ./src/backend/alembic.ini:/app/alembic.ini:ro
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - '5173:80'
+
+  db:
+    image: postgres:15
+    env_file:
+      - .env.example
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-radb}
+      POSTGRES_USER: ${POSTGRES_USER:-radb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-radb}
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    env_file:
+      - .env.example
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'PING']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
