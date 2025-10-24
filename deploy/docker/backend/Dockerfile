@@ -13,7 +13,9 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY src/backend/pyproject.toml src/backend/uv.lock ./
-RUN uv pip install --system --no-cache --locked -r uv.lock
+RUN uv export --format requirements.txt --output-file requirements.txt --no-dev --no-emit-project --locked \
+    && uv pip install --system --no-cache --requirement requirements.txt \
+    && rm requirements.txt
 
 COPY src/backend/app ./app
 COPY src/backend/alembic ./alembic
