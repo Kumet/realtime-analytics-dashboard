@@ -8,11 +8,16 @@ export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL.replace(/\/$/, ''),
   headers: { 'Content-Type': 'application/json' },
 })
 
 apiClient.interceptors.request.use((config) => {
+  const normalizedUrl = (config.url ?? '').replace(API_BASE_URL, '')
+  if (normalizedUrl.startsWith('/auth/login')) {
+    return config
+  }
+
   const token = localStorage.getItem('rad_token')
   if (token) {
     config.headers = config.headers ?? {}
@@ -20,6 +25,23 @@ apiClient.interceptors.request.use((config) => {
   }
   return config
 })
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401
+    ) {
+      localStorage.removeItem('rad_token')
+      const requestUrl = (error.config?.url ?? '').replace(API_BASE_URL, '')
+      if (!requestUrl.startsWith('/auth/login') && window.location.pathname !== '/') {
+        window.location.assign('/')
+      }
+    }
+    return Promise.reject(error)
+  },
+)
 
 export interface LoginPayload {
   email: string

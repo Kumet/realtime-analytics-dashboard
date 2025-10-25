@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { AxiosError } from 'axios'
 import { useNavigate } from 'react-router-dom'
 
 import './Login.css'
@@ -11,6 +12,11 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
+  useEffect(() => {
+    // stale token を除去し、常にクリーンな状態でログインする
+    localStorage.removeItem('rad_token')
+  }, [])
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setLoading(true)
@@ -18,9 +24,11 @@ export function LoginPage() {
     try {
       const result = await login({ email, password })
       localStorage.setItem('rad_token', result.access_token)
-      navigate('/dashboard')
-    } catch {
-      setError('認証に失敗しました')
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      const axiosError = err as AxiosError<{ detail?: string }>
+      const detail = axiosError.response?.data?.detail
+      setError(detail ?? '認証に失敗しました')
     } finally {
       setLoading(false)
     }
