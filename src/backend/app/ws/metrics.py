@@ -5,12 +5,19 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+)
 from fastapi.websockets import WebSocketState
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.dependencies.auth import get_current_user
-from app.models.user import User
+from app.dependencies.auth import get_current_user_from_websocket
+from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +44,16 @@ async def subscribe_channel(channel: str) -> AsyncIterator[str]:
 async def metrics_ws(
     websocket: WebSocket,
     metric_type: str,
-    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> None:
     await websocket.accept()
+    try:
+        user = await get_current_user_from_websocket(websocket, db)
+    except WebSocketException as exc:  # pragma: no cover
+        await websocket.close(code=exc.code, reason=exc.reason)
+        logger.warning("WS auth failed: %s", exc.reason)
+        return
+
     channel = f"metrics:{metric_type}"
     try:
         async for payload in subscribe_channel(channel):
