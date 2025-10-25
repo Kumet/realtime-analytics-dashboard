@@ -36,7 +36,7 @@ def _resolve_user(token: str | None, db: Session) -> User:
             token, settings.secret_key, algorithms=[settings.algorithm]
         )
     except JWTError as exc:
-        logger.warning("WS auth: decode failed %s", exc)
+        logger.warning("WS auth: decode failed token=%s error=%s", token, exc)
         raise CredentialsError from exc
 
     subject = payload.get("sub")
@@ -72,8 +72,10 @@ async def get_current_user_from_websocket(websocket: WebSocket, db: Session) -> 
             message = None
         if isinstance(message, dict):
             token = message.get("token")
+            logger.debug("WS auth: token from message %s", message)
 
     try:
         return _resolve_user(token, db)
     except HTTPException as exc:
+        logger.info("WS auth: credentials error detail=%s", exc.detail)
         raise WebSocketException(code=1008, reason=exc.detail)
