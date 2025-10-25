@@ -10,8 +10,23 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'auto-merge')
     runs-on: ubuntu-latest
     steps:
-      - uses: peter-evans/auto-merge@v3
+      - name: Check repository auto-merge setting
+        id: repo_settings
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            core.setOutput('allowed', data.allow_auto_merge ? 'true' : 'false');
+
+      - uses: peter-evans/enable-pull-request-automerge@v3
+        if: steps.repo_settings.outputs.allowed == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
-          commit-message: pull-request-title
+      - name: Auto-merge disabled notice
+        if: steps.repo_settings.outputs.allowed != 'true'
+        run: echo "Auto-merge is disabled for this repository; skipping enable step."
