@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
 
 from app.core.config import settings
@@ -36,7 +36,7 @@ async def subscribe_channel(channel: str) -> AsyncIterator[str]:
 @router.websocket("/ws/metrics")
 async def metrics_ws(
     websocket: WebSocket,
-    metric_type: str,
+    metric_type: Annotated[str, Query(alias="type")],
     user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     await websocket.accept()
