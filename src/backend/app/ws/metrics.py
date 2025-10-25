@@ -46,13 +46,14 @@ async def metrics_ws(
     metric_type: str,
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
-    await websocket.accept()
     try:
         user = get_current_user_from_websocket(websocket, db)
     except WebSocketException as exc:  # pragma: no cover
         await websocket.close(code=exc.code, reason=exc.reason)
         logger.warning("WS auth failed: %s", exc.reason)
         return
+
+    await websocket.accept()
 
     channel = f"metrics:{metric_type}"
     try:
