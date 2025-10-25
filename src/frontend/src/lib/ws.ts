@@ -15,9 +15,6 @@ export class MetricsSocket {
       import.meta.env.VITE_WS_BASE_URL ?? 'ws://localhost:8000/ws/metrics',
     )
     url.searchParams.set('type', this.metricType)
-    if (token) {
-      url.searchParams.set('token', token)
-    }
 
     this.socket = new WebSocket(url)
 

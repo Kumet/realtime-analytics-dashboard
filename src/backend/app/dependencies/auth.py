@@ -59,20 +59,20 @@ def get_current_user(
 
 
 async def get_current_user_from_websocket(websocket: WebSocket, db: Session) -> User:
-    token = websocket.query_params.get("token")
-    if not token:
-        auth_header = websocket.headers.get("Authorization")
-        if auth_header and auth_header.lower().startswith("bearer "):
-            token = auth_header.split(" ", 1)[1]
+    try:
+        message = await websocket.receive_json()
+        logger.debug("WS auth message: %s", message)
+    except Exception as exc:
+        logger.info("WS auth: failed to receive auth message %s", exc)
+        raise WebSocketException(code=1008, reason="Missing auth token")
+
+    token = None
+    if isinstance(message, dict):
+        token = message.get("token")
 
     if not token:
-        try:
-            message = await websocket.receive_json()
-        except Exception:
-            message = None
-        if isinstance(message, dict):
-            token = message.get("token")
-            logger.debug("WS auth: token from message %s", message)
+        logger.info("WS auth: token missing in auth message %s", message)
+        raise WebSocketException(code=1008, reason="Missing auth token")
 
     try:
         return _resolve_user(token, db)
