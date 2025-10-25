@@ -48,7 +48,7 @@ async def metrics_ws(
 ) -> None:
     await websocket.accept()
     try:
-        user = get_current_user_from_websocket(websocket, db)
+        user = await get_current_user_from_websocket(websocket, db)
     except WebSocketException as exc:  # pragma: no cover
         await websocket.close(code=exc.code, reason=exc.reason)
         logger.warning("WS auth failed: %s", exc.reason)

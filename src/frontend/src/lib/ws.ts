@@ -21,6 +21,11 @@ export class MetricsSocket {
 
     this.socket = new WebSocket(url)
 
+    this.socket.addEventListener('open', () => {
+      if (token) {
+        this.socket?.send(JSON.stringify({ type: 'auth', token }))
+      }
+    })
     this.socket.addEventListener('message', this.onMetric)
     this.socket.addEventListener('close', () => this.scheduleReconnect())
     this.socket.addEventListener('error', () => this.socket?.close())
