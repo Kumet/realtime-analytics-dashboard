@@ -11,13 +11,14 @@ flowchart LR
         E["psutil Collector<br/>(1s polling)"]
     end
 
-    A <-->|WebSocket (JWT)| B
-    A <-->|REST /metrics| B
-    E -->|CPU/MEM/DISK/NET| B
-    B -->|Publish latest| C
-    C -->|Realtime updates| A
-    B -->|1 min aggregates| D
-    D -->|Historical data| A
+    A -- "REST /metrics" --> B
+    A -- "WebSocket (JWT)" --> B
+    B -- "Realtime events" --> A
+    E -- "CPU/MEM/DISK/NET" --> B
+    B -- "Publish latest" --> C
+    C -- "Realtime updates" --> A
+    B -- "1 min aggregates" --> D
+    D -- "Historical data" --> B
 
     subgraph Tooling
         F["Docker Compose"]
