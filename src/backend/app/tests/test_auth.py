@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 
 from app.core.security import get_password_hash
+from app.models.metric import Metric
 from app.models.user import User, UserRole
 
 
@@ -50,6 +53,14 @@ def test_metrics_requires_authentication(client: TestClient) -> None:
 
 def test_metrics_returns_data_with_token(client: TestClient, db_session) -> None:
     create_user(db_session)
+    metric = Metric(
+        type="cpu",
+        value=75.0,
+        ts=datetime.now(timezone.utc).replace(second=0, microsecond=0),
+    )
+    db_session.add(metric)
+    db_session.commit()
+
     login_response = client.post(
         "/auth/login",
         json={"email": "admin@example.com", "password": "adminpass"},
@@ -61,4 +72,5 @@ def test_metrics_returns_data_with_token(client: TestClient, db_session) -> None
     assert response.status_code == 200
     payload = response.json()
     assert "series" in payload
-    assert payload["series"]
+    assert len(payload["series"]) == 1
+    assert payload["series"][0]["type"] == "cpu"
