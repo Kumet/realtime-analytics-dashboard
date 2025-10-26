@@ -1,77 +1,158 @@
-# リアルタイムアナリティクスダッシュボード
+# Realtime Analytics Dashboard
+> FastAPI × React × Redis Pub/Sub で、ローカルマシンのメトリクスをリアルタイム可視化するダッシュボード
 
-![Dashboard Overview](docs/media/main-desktop.png)
-
-FastAPI・PostgreSQL・Redis・psutil と Vite + React を組み合わせ、ローカルマシンのメトリクスを 1 秒間隔で収集・可視化するリアルタイムダッシュボードです。JWT 認証付き WebSocket で最新値を配信し、1 分単位の平均値を PostgreSQL にアーカイブします。
-
-## 主な特徴
-- **ライブ計測**：psutil から CPU / メモリ / ディスク I/O / ネットワーク I/O を取得し、Redis を介してフロントへ Push。
-- **集計と履歴**：1 分毎の平均値を PostgreSQL に保存し、REST API `/metrics` から取得可能。
-- **JWT & WebSocket**：ログイン後のトークンで WebSocket を認証、接続ロス時はクライアントが自動再試行。
-- **モダン UI**：白黒ベースのミニマルなデザイン（デスクトップ／モバイル対応）。
-
-![Login Screen](docs/media/login-desktop.png)
-
-## クイックツアー
+[![CI](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/ci.yml)
+[![Auto Merge](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/auto-merge.yml/badge.svg?branch=main)](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/auto-merge.yml)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](./LICENSE)
 
 <p align="center">
-  <img src="docs/media/full.gif" alt="Realtime dashboard walkthrough" width="720" />
+  <img src="docs/images/dashboard.png" alt="Dashboard overview" width="100%" />
 </p>
 
-## 前提条件
-- Docker / Docker Compose
-- Python 3.11 以上（バックエンドをホストから直接実行する場合）
-- Node.js 20 以上（Corepack 経由で pnpm を利用）
+## 🚀 Overview (TL;DR)
+- 1 秒ごとに psutil からシステムメトリクスを収集し、Redis を介してフロントに Push するリアルタイムダッシュボード。
+- FastAPI + PostgreSQL で JWT 認証・履歴 API を提供し、React + TypeScript でミニマルな UI を実現。
+- Docker Compose で一発起動でき、GitHub Actions / pre-commit / auto-merge による CI/CD が整備済み。
 
-## セットアップ
-1. 環境変数ファイルをコピーし、必要に応じて編集します。
+## 🧠 Tech Stack
+
+| Layer        | Technologies                                                                 |
+| ------------ | ---------------------------------------------------------------------------- |
+| Frontend     | React 19, TypeScript, Vite, React Query, Recharts                            |
+| Backend      | FastAPI, Pydantic, psutil, Redis Pub/Sub, WebSocket (JWT 認証)               |
+| Data         | PostgreSQL 15, SQLAlchemy, Alembic                                           |
+| Tooling      | Docker Compose, uv (Python), pnpm, pre-commit, GitHub Actions CI/CD          |
+
+## 🏗️ Architecture
+
+```mermaid
+%% Mermaid architecture diagram
+flowchart LR
+    subgraph Client
+        A[Browser\nReact + Vite + TypeScript]
+    end
+
+    subgraph Backend
+        B[FastAPI\nJWT Auth + REST]
+        C[(Redis\nPub/Sub)]
+        D[(PostgreSQL)]
+        E[psutil Collector\n(1s polling)]
+    end
+
+    A <-->|WebSocket (JWT)| B
+    A <-->|REST /metrics| B
+    E -->|CPU/MEM/DISK/NET| B
+    B -->|Publish latest| C
+    C -->|Realtime updates| A
+    B -->|1 min aggregates| D
+    D -->|Historical data| A
+
+    subgraph Tooling
+        F[Docker Compose]
+        G[GitHub Actions\nCI/CD]
+        H[pre-commit Hooks]
+    end
+
+    F --> A
+    F --> B
+    G --> B
+    G --> A
+    H --> B
+```
+
+<sub>Mermaid ソース: [`docs/architecture.mmd`](docs/architecture.mmd)</sub>
+
+## ⚙️ Setup
+
+1. 環境変数をコピーして編集
    ```bash
    cp .env.example .env
    ```
-   - `APP_ENV=local` + `METRICS_SOURCE=psutil` で psutil 収集が有効化されます。
-2. 依存イメージをビルドしつつコンテナ群を起動します。
+   - `APP_ENV=local` / `METRICS_SOURCE=psutil` で psutil 収集が有効化されます。
+2. Docker Compose で起動
    ```bash
    docker compose up --build
    ```
-3. 動作確認
-   - バックエンド API: `http://localhost:8000/docs`
-   - フロントエンド: `http://localhost:5173`
-   - デフォルトのデモアカウント：`admin@example.com` / `adminpass`
+3. アクセス
+   - Frontend: `http://localhost:5173`
+   - Backend OpenAPI: `http://localhost:8000/docs`
+   - Demo credentials: `admin@example.com` / `adminpass`
 
-## プロジェクト構成
+## 🔐 Auth & Endpoints
+
+| Method | Path / Channel              | Auth | Description                                      |
+| ------ | -------------------------- | ---- | ------------------------------------------------ |
+| GET    | `/health`                  | ❌   | ヘルスチェック                                   |
+| POST   | `/auth/login`              | ❌   | JWT アクセストークン発行（メール＋パスワード） |
+| GET    | `/metrics?type=cpu`        | ✅   | 指定メトリクスの 1 分平均値を返却               |
+| WS     | `/ws/metrics?type=cpu`     | ✅   | WebSocket (JWT) でリアルタイム値を配信          |
+
+- WebSocket はクエリ `token` もしくは初回メッセージ `{ "token": "<JWT>" }` で認証。
+- 1 分平均は PostgreSQL に保存、リアルタイム最新値は Redis Pub/Sub を経由。
+
+## 🧪 Tests & CI/CD
+
+| Category          | Command / Workflow                                                        | Notes                                           |
+| ----------------- | -------------------------------------------------------------------------- | ----------------------------------------------- |
+| Lint & format     | `pre-commit run --all-files`                                               | isort / ruff / prettier を一括実行              |
+| Backend tests     | `cd src/backend && uv run pytest`                                          | Strict asyncio モードで API を検証               |
+| Frontend tests    | `cd src/frontend && pnpm test --run`                                       | Vitest (または React Testing Library)           |
+| Playwright E2E    | `cd src/frontend && pnpm exec playwright test`                             | ログイン〜ダッシュボード操作を自動化             |
+| GitHub Actions CI | [ci.yml](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/ci.yml) | backend / frontend / e2e の3ジョブ             |
+| AI Review & Merge | [ai-review-fix.yml](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/ai-review-fix.yml), [auto-merge.yml](https://github.com/Kumet/realtime-analytics-dashboard/actions/workflows/auto-merge.yml) | PR の AI レビュー・自動マージ                   |
+
+## 🖼️ Screenshots / Demo
+
+> 実際のアセットを `docs/images/` 配下に配置してください。
+
+| Asset                              | Description                                   |
+| ---------------------------------- | --------------------------------------------- |
+| `docs/images/dashboard.png`        | ダッシュボード全景（ヒーロー画像）             |
+| `docs/images/ui-login.png`         | ログイン画面（モノトーンテーマ）               |
+| `docs/images/demo.gif`             | ログイン → 指標切替 → リアルタイム更新の流れ   |
+
+```bash
+# 推奨キャプチャ手順 (macOS例)
+open http://localhost:5173
+# QuickTime で画面収録 → Gifox / gifsicle で 800px 幅に圧縮
 ```
-src/
-├─ backend/        # FastAPI アプリケーション（uv 管理）
-└─ frontend/       # Vite + React アプリケーション（pnpm 管理）
-deploy/
-└─ docker/         # バックエンド／フロントエンド用 Dockerfile
-docker-compose.yml # バックエンド・フロント・Postgres・Redis を一括起動
-```
 
-## バックエンド開発メモ
-バックエンドは Python 3.12 + uv で依存管理を行います。
+## 👤 Author / Links
 
-- 依存追加例
-  ```bash
-  cd src/backend
-  uv add fastapi "uvicorn[standard]" sqlalchemy "psycopg[binary]" alembic \
-    pydantic-settings "passlib[bcrypt]" "python-jose[cryptography]" psutil redis
-  uv add --dev pytest httpx
-  ```
-- マイグレーション適用
-  ```bash
-  cd src/backend
-  docker compose up -d db
-  uv run alembic upgrade head
-  ```
+- Maintainer: [@Kumet](https://github.com/Kumet)
+- 外部記事: [Zenn: FastAPI×Reactで作るリアルタイムダッシュボード (準備中)](https://zenn.dev/)
+- Issue Tracker: [GitHub Issues](https://github.com/Kumet/realtime-analytics-dashboard/issues)
 
-`DATABASE_URL` を指定しない場合は `.env` の値（既定で `postgresql+psycopg://radb:radb@db:5432/radb`）が利用されます。
+## 🤝 Contributing
 
-## テスト
-- バックエンド：`cd src/backend && uv run pytest`
-- フロントエンド：`cd src/frontend && pnpm test --run`
-- Playwright E2E（README の GIF に相当するシナリオ）：`pnpm exec playwright test`
+1. ブランチ戦略
+   - `main`: 安定版
+   - `feat/*`, `fix/*`, `docs/*`, `chore/*`, `test/*` など用途別プレフィックス
+2. pre-commit をローカルで有効化
+   ```bash
+   pre-commit install
+   ```
+3. PR ポリシー
+   - テンプレ: `.github/PULL_REQUEST_TEMPLATE.md`（※未整備の場合は Issue # を参照）
+   - 1 PR 1 トピック、スクリーンショット必須（UI 変更時）
+   - ラベル運用: `area/frontend`, `area/backend`, `kind/bug`, `kind/feature`, `needs-review`
+
+## 🧯 Troubleshooting
+
+| Symptom                                       | Fix                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------- |
+| Docker 起動後に `/auth/login` が 401 になる   | `.env` の `DEMO_USER_*` が一致しているか、DB を `docker compose down -v` で再初期化 |
+| WebSocket が 403 / 1008 で落ちる             | フロントの LocalStorage `rad_token` を削除し再ログイン、`.env` の `SECRET_KEY` を確認 |
+| フロントでグラフが更新されない               | Redis が起動しているか確認 (`docker compose ps redis`)、`.env` の `METRICS_SOURCE` を `psutil` に設定 |
+| Playwright テストがブラウザ未取得で失敗       | `pnpm exec playwright install --with-deps` を先に実行               |
+| `uv run pytest` で Redis 接続エラー           | テスト環境では `APP_ENV=test` に設定済みか確認、psutil コレクタが無効になっているかチェック |
+
+## 📄 License
+
+Released under the [MIT License](./LICENSE).
 
 ---
 
-スクリーンショット・GIF は `docs/media/` 以下に配置しています。README に追記したい場合は同ディレクトリへ追加し、相対パスで参照してください。
+**GitHub Topics 推奨**: `fastapi`, `react`, `realtime`, `websocket`, `redis`, `postgresql`, `dashboard`
+**Pin 推奨**: 本リポジトリをプロフィールの Pinned に追加するとポートフォリオとして映えます。
