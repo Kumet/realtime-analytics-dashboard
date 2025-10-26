@@ -44,7 +44,8 @@ jobs:
       - run: corepack enable
       - working-directory: src/frontend
         run: pnpm install --frozen-lockfile || pnpm install
-      - uses: microsoft/playwright-github-action@v1
+      - working-directory: src/frontend
+        run: pnpm exec playwright install --with-deps
       - run: docker compose up -d --build backend frontend redis db
       - name: Wait for services
         run: |
