@@ -6,11 +6,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 
 TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
+
+settings.app_env = "test"
 
 engine = create_engine(
     TEST_DATABASE_URL,
