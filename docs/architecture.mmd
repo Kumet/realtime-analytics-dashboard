@@ -1,14 +1,14 @@
 %% Mermaid architecture diagram for realtime-analytics-dashboard
 flowchart LR
     subgraph Client
-        A[Browser\nReact + Vite + TypeScript]
+        A["Browser<br/>React + Vite + TypeScript"]
     end
 
     subgraph Backend
-        B[FastAPI\nJWT Auth + REST]
-        C[(Redis\nPub/Sub)]
-        D[(PostgreSQL)]
-        E[psutil Collector\n(1s polling)]
+        B["FastAPI<br/>JWT Auth + REST"]
+        C["Redis<br/>Pub/Sub"]
+        D["PostgreSQL"]
+        E["psutil Collector<br/>(1s polling)"]
     end
 
     A <-->|WebSocket (JWT)| B
@@ -20,9 +20,9 @@ flowchart LR
     D -->|Historical data| A
 
     subgraph Tooling
-        F[Docker Compose]
-        G[GitHub Actions\nCI/CD]
-        H[pre-commit Hooks]
+        F["Docker Compose"]
+        G["GitHub Actions<br/>CI/CD"]
+        H["pre-commit Hooks"]
     end
 
     F --> A
