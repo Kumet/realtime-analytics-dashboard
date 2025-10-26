@@ -16,6 +16,7 @@ dependencies = [
     "alembic>=1.13.1,<2",
     "redis>=5.0.3,<6",
     "httpx>=0.27,<0.28",
+    "psutil>=5.9,<6",
 ]
 
 [tool.hatch.build.targets.wheel]
