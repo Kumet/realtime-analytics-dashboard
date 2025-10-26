@@ -10,6 +10,10 @@
   <img src="docs/images/dashboard.png" alt="Dashboard overview" width="100%" />
 </p>
 
+<p align="center">
+  <img src="docs/images/ui-login.png" alt="Login screen" width="100%" />
+</p>
+
 ## 🚀 Overview
 - 1 秒ごとに psutil からシステムメトリクスを収集し、Redis を介してフロントに Push するリアルタイムダッシュボード。
 - FastAPI + PostgreSQL で JWT 認証・履歴 API を提供し、React + TypeScript でミニマルな UI を実現。
@@ -40,13 +44,14 @@ flowchart LR
         E["psutil Collector<br/>(1s polling)"]
     end
 
-    A <-->|WebSocket (JWT)| B
-    A <-->|REST /metrics| B
-    E -->|CPU/MEM/DISK/NET| B
-    B -->|Publish latest| C
-    C -->|Realtime updates| A
-    B -->|1 min aggregates| D
-    D -->|Historical data| A
+    A -- "REST /metrics" --> B
+    A -- "WebSocket (JWT)" --> B
+    B -- "Realtime events" --> A
+    E -- "CPU/MEM/DISK/NET" --> B
+    B -- "Publish latest" --> C
+    C -- "Realtime updates" --> A
+    B -- "1 min aggregates" --> D
+    D -- "Historical data" --> B
 
     subgraph Tooling
         F["Docker Compose"]
@@ -108,13 +113,6 @@ flowchart LR
 | ---------------------------------- | --------------------------------------------- |
 | `docs/images/dashboard.png`        | ダッシュボード全景（ヒーロー画像）             |
 | `docs/images/ui-login.png`         | ログイン画面（モノトーンテーマ）               |
-| `docs/images/demo.gif`             | ログイン → 指標切替 → リアルタイム更新の流れ   |
-
-## 👤 Author / Links
-
-- Maintainer: [@Kumet](https://github.com/Kumet)
-- Issue Tracker: [GitHub Issues](https://github.com/Kumet/realtime-analytics-dashboard/issues)
-- 外部記事: [Zenn: FastAPI×Reactで作るリアルタイムダッシュボード (準備中)](https://zenn.dev/)
 
 ## 🤝 Contributing
 
@@ -139,12 +137,3 @@ flowchart LR
 | フロントでグラフが更新されない               | Redis が起動しているか確認 (`docker compose ps redis`)、`.env` の `METRICS_SOURCE` を `psutil` に設定 |
 | Playwright テストがブラウザ未取得で失敗       | `pnpm exec playwright install --with-deps` を先に実行               |
 | `uv run pytest` で Redis 接続エラー           | テスト環境では `APP_ENV=test` に設定済みか確認、psutil コレクタが無効になっているかチェック |
-
-## 📄 License
-
-Released under the [MIT License](./LICENSE).
-
----
-
-**GitHub Topics 推奨**: `fastapi`, `react`, `realtime`, `websocket`, `redis`, `postgresql`, `dashboard`
-**Pin 推奨**: 本リポジトリをプロフィールの Pinned に追加するとポートフォリオとして映えます。
