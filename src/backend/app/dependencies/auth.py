@@ -25,7 +25,6 @@ CredentialsError = HTTPException(
 
 def _resolve_user(token: str | None, db: Session) -> User:
     if not token:
-        logger.info("WS auth: missing token")
         raise CredentialsError
 
     try:
@@ -33,17 +32,17 @@ def _resolve_user(token: str | None, db: Session) -> User:
             token, settings.secret_key, algorithms=[settings.algorithm]
         )
     except JWTError as exc:
-        logger.warning("WS auth: decode failed token=%s error=%s", token, exc)
+        logger.warning("WS auth: JWT decode failed error=%s", exc)
         raise CredentialsError from exc
 
     subject = payload.get("sub")
     if not isinstance(subject, str) or not subject:
-        logger.info("WS auth: invalid subject %s", subject)
+        logger.info("WS auth: invalid subject sub=%s", subject)
         raise CredentialsError
 
     user = db.execute(select(User).where(User.email == subject)).scalar_one_or_none()
     if user is None:
-        logger.info("WS auth: user not found %s", subject)
+        logger.info("WS auth: user not found email=%s", subject)
         raise CredentialsError
     return user
 
@@ -64,20 +63,24 @@ async def get_current_user_from_websocket(
     if not token:
         try:
             message = await websocket.receive_json()
-            logger.debug("WS auth message: %s", message)
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.info("WS auth: failed to receive auth message %s", exc)
+            logger.info("WS auth: failed to receive auth payload %s", exc)
             raise WebSocketException(code=1008, reason="Missing auth token") from exc
 
-        if isinstance(message, dict):
-            token = message.get("token")
+        if not isinstance(message, dict):
+            logger.info("WS auth: unexpected payload type=%s", type(message))
+            raise WebSocketException(code=1008, reason="Missing auth token")
 
-    if not token:
-        logger.info("WS auth: token missing after query/message inspection")
-        raise WebSocketException(code=1008, reason="Missing auth token")
+        token_value = message.get("token")
+        if not isinstance(token_value, str) or not token_value:
+            logger.info(
+                "WS auth: token missing in payload keys=%s", list(message.keys())
+            )
+            raise WebSocketException(code=1008, reason="Missing auth token")
+
+        token = token_value
 
     try:
         return _resolve_user(token, db)
     except HTTPException as exc:
-        logger.info("WS auth: credentials error detail=%s", exc.detail)
         raise WebSocketException(code=1008, reason=exc.detail) from exc

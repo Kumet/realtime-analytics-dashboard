@@ -17,6 +17,7 @@ export interface MetricsSocketOptions {
 const DEFAULT_MAX_RETRIES = 5
 const DEFAULT_BASE_DELAY = 1000
 const DEFAULT_MAX_DELAY = 10000
+const AUTH_CLOSE_CODES = new Set([1008, 4003, 4401, 4403])
 
 export class MetricsSocket {
   private socket: WebSocket | null = null
@@ -67,7 +68,16 @@ export class MetricsSocket {
       import.meta.env.VITE_WS_BASE_URL ?? 'ws://localhost:8000/ws/metrics',
     )
     url.searchParams.set('type', this.metricType)
+    url.searchParams.set('metric_type', this.metricType)
     url.searchParams.set('token', token)
+
+    const redactedUrl = new URL(url.toString())
+    redactedUrl.searchParams.set('token', '[redacted]')
+    console.info('MetricsSocket connecting', {
+      metricType: this.metricType,
+      attempt: this.attempts + 1,
+      url: redactedUrl.toString(),
+    })
 
     try {
       this.socket = new WebSocket(url)
@@ -99,25 +109,61 @@ export class MetricsSocket {
     this.updateStatus('closed')
   }
 
-  private handleOpen = (): void => {
+  private handleOpen = (_event: Event): void => {
+    console.info('MetricsSocket connected', {
+      metricType: this.metricType,
+      url: this.socket?.url ? this.sanitizeUrl(this.socket.url) : undefined,
+    })
     this.attempts = 0
     const token = localStorage.getItem('rad_token')
     if (token) {
-      this.socket?.send(JSON.stringify({ type: 'auth', token }))
+      this.socket?.send(JSON.stringify({ token }))
     }
     this.updateStatus('connected')
   }
 
-  private handleClose = (): void => {
+  private handleClose = (event: CloseEvent): void => {
+    console.warn('MetricsSocket closed', {
+      metricType: this.metricType,
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean,
+    })
     this.cleanupSocket()
     if (this.manualClose) {
       return
     }
+
+    if (AUTH_CLOSE_CODES.has(event.code)) {
+      console.error('WebSocket authentication failed', {
+        code: event.code,
+        reason: event.reason,
+      })
+      this.handleFailure(
+        new Error(
+          event.code === 1008
+            ? '認証に失敗しました。再度ログインしてください。'
+            : `認証に失敗しました (code: ${event.code}).`,
+        ),
+      )
+      return
+    }
+
     this.scheduleReconnect()
   }
 
-  private handleError = (): void => {
-    this.options.onError?.(new Error('WebSocket error'))
+  private handleError = (event: Event): void => {
+    const errorEvent = event as ErrorEvent
+    console.error('MetricsSocket error', {
+      metricType: this.metricType,
+      message: errorEvent.message,
+      filename: errorEvent.filename,
+      lineno: errorEvent.lineno,
+      colno: errorEvent.colno,
+    })
+    this.options.onError?.(
+      new Error(errorEvent.message || 'WebSocket error encountered'),
+    )
     this.socket?.close()
   }
 
@@ -138,6 +184,10 @@ export class MetricsSocket {
     }
 
     this.attempts += 1
+    console.info('MetricsSocket scheduling reconnect', {
+      metricType: this.metricType,
+      attempt: this.attempts,
+    })
     this.updateStatus('reconnecting')
 
     const delay = Math.min(
@@ -146,10 +196,21 @@ export class MetricsSocket {
     )
 
     this.clearReconnectTimer()
-    this.reconnectTimeout = window.setTimeout(() => this.connect(), delay)
+    this.reconnectTimeout = window.setTimeout(() => {
+      console.debug('MetricsSocket reconnecting now', {
+        metricType: this.metricType,
+        attempt: this.attempts,
+      })
+      this.connect()
+    }, delay)
   }
 
   private handleFailure(error: Error): void {
+    console.error('MetricsSocket failure', {
+      metricType: this.metricType,
+      attempts: this.attempts,
+      message: error.message,
+    })
     this.updateStatus('failed')
     this.options.onError?.(error)
     this.cleanupSocket()
@@ -165,5 +226,13 @@ export class MetricsSocket {
       window.clearTimeout(this.reconnectTimeout)
       this.reconnectTimeout = null
     }
+  }
+
+  private sanitizeUrl(rawUrl: string): string {
+    const url = new URL(rawUrl)
+    if (url.searchParams.has('token')) {
+      url.searchParams.set('token', '[redacted]')
+    }
+    return url.toString()
   }
 }

@@ -44,15 +44,28 @@ async def subscribe_channel(channel: str) -> AsyncIterator[str]:
 @router.websocket("/ws/metrics")
 async def metrics_ws(
     websocket: WebSocket,
-    metric_type: str,
     db: Annotated[Session, Depends(get_db)],
 ) -> None:
+    metric_type = (
+        websocket.query_params.get("type")
+        or websocket.query_params.get("metric_type")
+        or ""
+    ).strip()
+
+    if not metric_type:
+        await websocket.close(code=1008, reason="Missing metric type")
+        logger.warning(
+            "WS connection rejected due to missing metric type client=%s params=%s",
+            websocket.client,
+            dict(websocket.query_params),
+        )
+        return
+
     await websocket.accept()
     try:
         user: User = await get_current_user_from_websocket(websocket, db)
     except WebSocketException as exc:  # pragma: no cover
-        await websocket.close(code=exc.code, reason=exc.reason)
-        logger.warning("WS auth failed: %s", exc.reason)
+        await websocket.close(code=1008, reason=exc.reason or "Authentication failed")
         return
 
     channel = f"metrics:{metric_type}"
@@ -62,9 +75,11 @@ async def metrics_ws(
                 break
             await websocket.send_text(payload)
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected for %s", user.email)
+        pass
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.exception("WebSocket error: %s", exc)
+        logger.exception(
+            "WebSocket error metric_type=%s user=%s: %s", metric_type, user.email, exc
+        )
     finally:
         if websocket.application_state == WebSocketState.CONNECTED:
             await websocket.close()
