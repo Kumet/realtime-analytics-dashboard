@@ -28,33 +28,36 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <form className="login-form" onSubmit={handleLogin}>
-        <h1>Realtime Analytics Dashboard</h1>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </label>
+      <div className="login-shell">
+        <form className="login-form" onSubmit={handleLogin}>
+          <h1>Realtime Analytics Dashboard</h1>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
 
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-        </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
-        </button>
-        {error ? <p className="login-error">{error}</p> : null}
-      </form>
+          <button type="submit" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+          {error ? <p className="login-error">{error}</p> : null}
+          <footer>Sign in with the demo credentials to explore live metrics.</footer>
+        </form>
+      </div>
     </div>
   )
 }
