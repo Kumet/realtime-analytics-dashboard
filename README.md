@@ -10,7 +10,7 @@
   <img src="docs/images/dashboard.png" alt="Dashboard overview" width="100%" />
 </p>
 
-## 🚀 Overview (TL;DR)
+## 🚀 Overview
 - 1 秒ごとに psutil からシステムメトリクスを収集し、Redis を介してフロントに Push するリアルタイムダッシュボード。
 - FastAPI + PostgreSQL で JWT 認証・履歴 API を提供し、React + TypeScript でミニマルな UI を実現。
 - Docker Compose で一発起動でき、GitHub Actions / pre-commit / auto-merge による CI/CD が整備済み。
@@ -30,14 +30,14 @@
 %% Mermaid architecture diagram
 flowchart LR
     subgraph Client
-        A[Browser\nReact + Vite + TypeScript]
+        A["Browser<br/>React + Vite + TypeScript"]
     end
 
     subgraph Backend
-        B[FastAPI\nJWT Auth + REST]
-        C[(Redis\nPub/Sub)]
-        D[(PostgreSQL)]
-        E[psutil Collector\n(1s polling)]
+        B["FastAPI<br/>JWT Auth + REST"]
+        C["Redis<br/>Pub/Sub"]
+        D["PostgreSQL"]
+        E["psutil Collector<br/>(1s polling)"]
     end
 
     A <-->|WebSocket (JWT)| B
@@ -49,9 +49,9 @@ flowchart LR
     D -->|Historical data| A
 
     subgraph Tooling
-        F[Docker Compose]
-        G[GitHub Actions\nCI/CD]
-        H[pre-commit Hooks]
+        F["Docker Compose"]
+        G["GitHub Actions<br/>CI/CD"]
+        H["pre-commit Hooks"]
     end
 
     F --> A
@@ -104,25 +104,17 @@ flowchart LR
 
 ## 🖼️ Screenshots / Demo
 
-> 実際のアセットを `docs/images/` 配下に配置してください。
-
 | Asset                              | Description                                   |
 | ---------------------------------- | --------------------------------------------- |
 | `docs/images/dashboard.png`        | ダッシュボード全景（ヒーロー画像）             |
 | `docs/images/ui-login.png`         | ログイン画面（モノトーンテーマ）               |
 | `docs/images/demo.gif`             | ログイン → 指標切替 → リアルタイム更新の流れ   |
 
-```bash
-# 推奨キャプチャ手順 (macOS例)
-open http://localhost:5173
-# QuickTime で画面収録 → Gifox / gifsicle で 800px 幅に圧縮
-```
-
 ## 👤 Author / Links
 
 - Maintainer: [@Kumet](https://github.com/Kumet)
-- 外部記事: [Zenn: FastAPI×Reactで作るリアルタイムダッシュボード (準備中)](https://zenn.dev/)
 - Issue Tracker: [GitHub Issues](https://github.com/Kumet/realtime-analytics-dashboard/issues)
+- 外部記事: [Zenn: FastAPI×Reactで作るリアルタイムダッシュボード (準備中)](https://zenn.dev/)
 
 ## 🤝 Contributing
 
