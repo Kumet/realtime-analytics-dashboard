@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -16,12 +18,35 @@ from app.db.session import SessionLocal, get_db
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        with SessionLocal() as session:
+            seed_initial_data(session)
+    except Exception as exc:  # pragma: no cover - best effort seeding
+        logger.warning("Skipping database seed during startup: %s", exc)
+
+    generator_task: asyncio.Task | None = None
+    if settings.app_env == "local":
+        generator_task = asyncio.create_task(start_generator())
+
+    try:
+        yield
+    finally:
+        if generator_task:
+            generator_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await generator_task
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -31,16 +56,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup() -> None:
-    try:
-        with SessionLocal() as session:
-            seed_initial_data(session)
-    except Exception as exc:  # pragma: no cover - best effort seeding
-        logger.warning("Skipping database seed during startup: %s", exc)
-    asyncio.create_task(start_generator())
 
 
 @app.get("/health")
