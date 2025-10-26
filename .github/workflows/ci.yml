@@ -46,7 +46,21 @@ jobs:
         run: pnpm install --frozen-lockfile || pnpm install
       - working-directory: src/frontend
         run: pnpm exec playwright install --with-deps
-      - run: docker compose up -d --build backend frontend redis db
+      - run: docker compose build backend frontend
+      - run: docker compose up -d db redis
+      - name: Wait for database
+        run: |
+          for attempt in {1..30}; do
+            if docker compose exec -T db pg_isready -U radb -d radb >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Database did not become ready in time" >&2
+          docker compose logs db
+          exit 1
+      - run: docker compose run --rm backend alembic upgrade head
+      - run: docker compose up -d backend frontend
       - name: Wait for services
         run: |
           for attempt in {1..30}; do
@@ -63,6 +77,6 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://localhost:5173
         run: pnpm exec playwright test
       - if: failure()
-        run: docker compose logs backend frontend
+        run: docker compose logs backend frontend db
       - if: always()
         run: docker compose down
